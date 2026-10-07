@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.mp4
+*.avi
+*.blob
+*.bin
+*.pt
+graphify-out/
+model_cache/
+yolo real time/.venv/
+yolo real time/model_cache/
+yolo real time/graphify-out/
+yolo real time/video test/
+QuickLaunch Folder/*.pt

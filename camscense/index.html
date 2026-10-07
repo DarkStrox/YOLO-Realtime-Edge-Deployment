@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CamScense — YOLO Deployment</title>
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --panel: #131a2b;
+      --accent: #00e5ff;
+      --accent2: #7c4dff;
+      --text: #e6edf6;
+      --muted: #8b98ad;
+      --danger: #ff4d6d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #16203a, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 28px; border-bottom: 1px solid #1f2a44;
+    }
+    .logo { font-size: 24px; font-weight: 800; letter-spacing: 1px; }
+    .logo span { color: var(--accent); }
+    .statuspill {
+      font-size: 13px; color: var(--muted);
+      border: 1px solid #243150; padding: 6px 14px; border-radius: 999px;
+    }
+    .statuspill b { color: var(--accent); }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px; }
+    .hero { text-align: center; margin-bottom: 28px; }
+    .hero h1 { font-size: 30px; margin: 0 0 6px; }
+    .hero p { color: var(--muted); margin: 0; }
+    .options {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+    }
+    .card {
+      background: var(--panel); border: 1px solid #1f2a44; border-radius: 16px;
+      padding: 24px; cursor: pointer; transition: .2s; position: relative; overflow: hidden;
+    }
+    .card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 10px 40px rgba(0,229,255,.15); }
+    .card.active { border-color: var(--accent2); box-shadow: 0 0 0 2px var(--accent2) inset; }
+    .card .num {
+      width: 34px; height: 34px; border-radius: 50%; background: var(--accent2);
+      color: #fff; display: grid; place-items: center; font-weight: 700; margin-bottom: 14px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .controls { margin: 24px 0; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .controls label { color: var(--muted); font-size: 14px; }
+    .controls input[type=number] {
+      width: 70px; padding: 8px; border-radius: 8px; border: 1px solid #243150;
+      background: #0d1424; color: var(--text);
+    }
+    button {
+      border: none; border-radius: 10px; padding: 10px 22px; font-size: 15px;
+      font-weight: 700; cursor: pointer; transition: .15s;
+    }
+    .btn-start { background: var(--accent); color: #04121a; }
+    .btn-start:hover { filter: brightness(1.1); }
+    .btn-stop { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    .btn-stop:hover { background: rgba(255,77,109,.12); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .viewer {
+      margin-top: 22px; background: #05080f; border: 1px solid #1f2a44; border-radius: 16px;
+      aspect-ratio: 16/9; display: grid; place-items: center; overflow: hidden; position: relative;
+    }
+    .viewer img { width: 100%; height: 100%; object-fit: contain; display: none; }
+    .viewer .placeholder { color: var(--muted); text-align: center; padding: 20px; }
+    .badge {
+      position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,.55);
+      padding: 6px 12px; border-radius: 8px; font-size: 13px; color: var(--accent); display: none;
+    }
+    .err { color: var(--danger); margin-top: 12px; min-height: 20px; font-size: 14px; }
+    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+    @media (max-width: 760px) { .options { grid-template-columns: 1fr; } }
+
+    /* Company Cameras Control Panel Styles */
+    .company-panel {
+      background: var(--panel);
+      border: 1px solid #1f2a44;
+      border-radius: 14px;
+      padding: 20px;
+      margin: 16px 0;
+      animation: fadeIn 0.3s ease;
+    }
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 800;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .control-btn {
+      background: #0d1424;
+      border: 1px solid #243150;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .control-btn:hover {
+      border-color: var(--accent);
+      background: rgba(0, 229, 255, 0.05);
+    }
+    .control-btn.active {
+      background: var(--accent);
+      color: #04121a;
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    }
+    .camera-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+      gap: 8px;
+    }
+    .cam-btn {
+      background: #0d1424;
+      border: 1px solid #243150;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .cam-btn:hover {
+      border-color: var(--accent2);
+      background: rgba(124, 77, 255, 0.05);
+    }
+    .cam-btn.active {
+      background: var(--accent2);
+      color: #fff;
+      border-color: var(--accent2);
+      box-shadow: 0 0 10px rgba(124, 77, 255, 0.3);
+    }
+
+    /* Mode Toggles */
+    .mode-toggles {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+    .mode-btn {
+      background: rgba(19, 26, 43, 0.85);
+      border: 1px solid #1f2a44;
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+    .mode-btn:hover {
+      border-color: var(--accent);
+      background: rgba(19, 26, 43, 0.95);
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #04121a;
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Cam<span>Scense</span></div>
+    <div class="statuspill" id="statuspill">Idle</div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <h1>YOLO Real-Time Deployment</h1>
+      <p>Choose a video source to start object detection.</p>
+    </div>
+
+    <div class="options">
+      <div class="card" data-mode="laptop">
+        <div class="num">1</div>
+        <h3>Laptop Camera</h3>
+        <p>Use your built-in or USB webcam for live detection.</p>
+      </div>
+      <div class="card" data-mode="company">
+        <div class="num">2</div>
+        <h3>Company Cameras</h3>
+        <p>Stream multiple Hikvision RTSP cameras in a live grid.</p>
+      </div>
+      <div class="card" data-mode="video">
+        <div class="num">3</div>
+        <h3>Video Test</h3>
+        <p>Run detection on the looping crowd.mp4 test footage.</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div id="streamCountWrapper">
+        <label>Stream count:
+          <input type="number" id="count" min="1" max="11" value="4" />
+        </label>
+      </div>
+      <div id="videoSelectWrapper" style="display: none; margin-left: 10px;">
+        <label>Select Video:
+          <select id="videoSelect" style="padding: 8px; border-radius: 8px; border: 1px solid #243150; background: #0d1424; color: var(--text); font-weight: 600;"></select>
+        </label>
+      </div>
+      <button class="btn-start" id="startBtn">Start Detection</button>
+      <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <!-- Company Cameras Control Panel -->
+    <div id="companyControls" class="company-panel" style="display: none;">
+      <div class="section-title">Select Grid Layout</div>
+      <div class="btn-group" id="companyGridGroup">
+        <button class="control-btn" data-grid="2">Grid: 2</button>
+        <button class="control-btn active" data-grid="4">Grid: 4</button>
+        <button class="control-btn" data-grid="9">Grid: 9</button>
+        <button class="control-btn" data-grid="all">Grid: All</button>
+      </div>
+
+      <div class="section-title">Select Individual Camera</div>
+      <div class="camera-list" id="cameraListContainer"></div>
+    </div>
+
+    <div class="viewer">
+      <div class="placeholder" id="placeholder">Select an option above and press <b>Start Detection</b>.</div>
+      <img id="feed" alt="Live YOLO feed" />
+      <div class="badge" id="modeBadge"></div>
+      <div class="mode-toggles">
+        <button class="mode-btn active" id="modeDetectBtn">Object Detection</button>
+        <button class="mode-btn" id="modeHeatmapBtn">Heatmap Mode</button>
+        <button class="mode-btn" id="modeSpeedBtn">Speed Estimation</button>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+  </main>
+
+  <footer>CamScense · Powered by Ultralytics YOLO + PyTorch</footer>
+
+  <script>
+    const cards = document.querySelectorAll('.card');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const feed = document.getElementById('feed');
+    const placeholder = document.getElementById('placeholder');
+    const modeBadge = document.getElementById('modeBadge');
+    const statuspill = document.getElementById('statuspill');
+    const errBox = document.getElementById('err');
+    const countInput = document.getElementById('count');
+
+    let selectedMode = null;
+    let feedActive = false;
+    let statusTimer = null;
+
+    let cameraCount = 11;
+    let companyIndices = [0, 1, 2, 3];
+    let runMode = 'detect';
+
+    function updateCardControlVisibility() {
+      const streamCountWrapper = document.getElementById('streamCountWrapper');
+      const companyControls = document.getElementById('companyControls');
+      const videoSelectWrapper = document.getElementById('videoSelectWrapper');
+      if (selectedMode === 'laptop') {
+        streamCountWrapper.style.display = 'none';
+        companyControls.style.display = 'none';
+        videoSelectWrapper.style.display = 'none';
+      } else if (selectedMode === 'video') {
+        streamCountWrapper.style.display = 'block';
+        companyControls.style.display = 'none';
+        videoSelectWrapper.style.display = 'block';
+      } else if (selectedMode === 'company') {
+        streamCountWrapper.style.display = 'none';
+        companyControls.style.display = 'block';
+        videoSelectWrapper.style.display = 'none';
+      }
+    }
+
+    cards.forEach(c => {
+      c.addEventListener('click', () => {
+        cards.forEach(x => x.classList.remove('active'));
+        c.classList.add('active');
+        selectedMode = c.dataset.mode;
+        errBox.textContent = '';
+        updateCardControlVisibility();
+      });
+    });
+
+    // Populate camera buttons dynamically
+    function renderCompanyCameras() {
+      const container = document.getElementById('cameraListContainer');
+      container.innerHTML = '';
+      for (let i = 0; i < cameraCount; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'cam-btn';
+        btn.textContent = 'Cam ' + (i + 1);
+        btn.dataset.index = i;
+        btn.addEventListener('click', () => {
+          selectCompanyCamera(i);
+        });
+        container.appendChild(btn);
+      }
+      updateActiveGridOrCamHighlight();
+    }
+
+    function updateActiveGridOrCamHighlight() {
+      // Highlight grid button if it matches companyIndices
+      document.querySelectorAll('#companyGridGroup .control-btn').forEach(btn => {
+        const gridVal = btn.dataset.grid;
+        let expectedCount = gridVal === 'all' ? cameraCount : parseInt(gridVal);
+        let isMatching = false;
+        if (companyIndices && companyIndices.length === expectedCount) {
+          isMatching = companyIndices.every((val, idx) => val === idx);
+        }
+        if (isMatching) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Highlight single camera button if matching
+      document.querySelectorAll('.cam-btn').forEach(btn => {
+        const idx = parseInt(btn.dataset.index);
+        if (companyIndices && companyIndices.length === 1 && companyIndices[0] === idx) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    function selectCompanyCamera(index) {
+      companyIndices = [index];
+      updateActiveGridOrCamHighlight();
+      if (feedActive) {
+        start();
+      }
+    }
+
+    // Grid size selections
+    document.querySelectorAll('#companyGridGroup .control-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gridVal = btn.dataset.grid;
+        let count = 4;
+        if (gridVal === 'all') {
+          count = cameraCount;
+        } else {
+          count = parseInt(gridVal) || 4;
+        }
+        companyIndices = [];
+        for (let i = 0; i < Math.min(count, cameraCount); i++) {
+          companyIndices.push(i);
+        }
+        updateActiveGridOrCamHighlight();
+        if (feedActive) {
+          start();
+        }
+      });
+    });
+
+    // Top-right mode button selection
+    const modeDetectBtn = document.getElementById('modeDetectBtn');
+    const modeHeatmapBtn = document.getElementById('modeHeatmapBtn');
+    const modeSpeedBtn = document.getElementById('modeSpeedBtn');
+
+    modeDetectBtn.addEventListener('click', () => {
+      if (runMode === 'detect') return;
+      runMode = 'detect';
+      modeDetectBtn.classList.add('active');
+      modeHeatmapBtn.classList.remove('active');
+      modeSpeedBtn.classList.remove('active');
+      if (feedActive) {
+        start();
+      }
+    });
+
+    modeHeatmapBtn.addEventListener('click', () => {
+      if (runMode === 'heatmap') return;
+      runMode = 'heatmap';
+      modeDetectBtn.classList.remove('active');
+      modeHeatmapBtn.classList.add('active');
+      modeSpeedBtn.classList.remove('active');
+      if (feedActive) {
+        start();
+      }
+    });
+
+    modeSpeedBtn.addEventListener('click', () => {
+      if (runMode === 'speed') return;
+      runMode = 'speed';
+      modeDetectBtn.classList.remove('active');
+      modeHeatmapBtn.classList.remove('active');
+      modeSpeedBtn.classList.add('active');
+      if (feedActive) {
+        start();
+      }
+    });
+
+    function setStatus(text, color) {
+      statuspill.innerHTML = text;
+      statuspill.style.color = color || 'var(--muted)';
+    }
+
+    async function start() {
+      if (!selectedMode) {
+        errBox.textContent = 'Please choose an option (1, 2 or 3) first.';
+        return;
+      }
+      errBox.textContent = '';
+      startBtn.disabled = true;
+
+      const payload = {
+        mode: selectedMode,
+        run_mode: runMode
+      };
+
+      if (selectedMode === 'laptop') {
+        payload.count = 1;
+      } else if (selectedMode === 'video') {
+        payload.count = parseInt(countInput.value) || 4;
+        payload.video = videoSelect.value;
+      } else if (selectedMode === 'company') {
+        payload.indices = companyIndices;
+      }
+
+      try {
+        const res = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to start');
+
+        placeholder.style.display = 'none';
+        feed.style.display = 'block';
+        modeBadge.style.display = 'block';
+        modeBadge.textContent = '● ' + selectedMode.toUpperCase() + ' (' + runMode.toUpperCase() + ')';
+        feed.src = '/video_feed?t=' + Date.now();
+        feedActive = true;
+        stopBtn.disabled = false;
+        setStatus('Running: <b>' + data.mode + '</b> (' + data.run_mode + ') · ' + data.streams + ' stream(s)', 'var(--accent)');
+        pollStatus();
+      } catch (e) {
+        errBox.textContent = e.message;
+        startBtn.disabled = false;
+        stop();
+      }
+    }
+
+    async function stop() {
+      try {
+        await fetch('/api/stop', { method: 'POST' });
+      } catch (e) {}
+      feedActive = false;
+      feed.src = '';
+      feed.style.display = 'none';
+      placeholder.style.display = 'block';
+      modeBadge.style.display = 'none';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      setStatus('Idle');
+      if (statusTimer) clearInterval(statusTimer);
+    }
+
+    async function pollStatus() {
+      if (statusTimer) clearInterval(statusTimer);
+      statusTimer = setInterval(async () => {
+        if (!feedActive) return;
+        try {
+          const r = await fetch('/api/status');
+          const s = await r.json();
+          if (!s.active) {
+            stop();
+          } else {
+            setStatus('Running: <b>' + s.mode + '</b> (' + s.run_mode + ') · ' + s.streams + ' stream(s) · ' + s.uptime + 's', 'var(--accent)');
+          }
+        } catch (e) {}
+      }, 1500);
+    }
+
+    async function fetchConfig() {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const config = await res.json();
+          cameraCount = config.camera_count || 11;
+          renderCompanyCameras();
+
+          if (config.active_mode) {
+            selectedMode = config.active_mode;
+            runMode = config.active_run_mode || 'detect';
+
+            cards.forEach(x => {
+              if (x.dataset.mode === selectedMode) {
+                x.classList.add('active');
+              } else {
+                x.classList.remove('active');
+              }
+            });
+
+            if (runMode === 'heatmap') {
+              modeDetectBtn.classList.remove('active');
+              modeHeatmapBtn.classList.add('active');
+              modeSpeedBtn.classList.remove('active');
+            } else if (runMode === 'speed') {
+              modeDetectBtn.classList.remove('active');
+              modeHeatmapBtn.classList.remove('active');
+              modeSpeedBtn.classList.add('active');
+            } else {
+              modeDetectBtn.classList.add('active');
+              modeHeatmapBtn.classList.remove('active');
+              modeSpeedBtn.classList.remove('active');
+            }
+
+            updateCardControlVisibility();
+
+            feedActive = true;
+            placeholder.style.display = 'none';
+            feed.style.display = 'block';
+            modeBadge.style.display = 'block';
+            modeBadge.textContent = '● ' + selectedMode.toUpperCase() + ' (' + runMode.toUpperCase() + ')';
+            feed.src = '/video_feed?t=' + Date.now();
+            stopBtn.disabled = false;
+            startBtn.disabled = true;
+            pollStatus();
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load config:", e);
+      }
+    }
+
+    const videoSelect = document.getElementById('videoSelect');
+
+    async function loadVideosList() {
+      try {
+        const res = await fetch('/api/videos');
+        if (res.ok) {
+          const data = await res.json();
+          videoSelect.innerHTML = '';
+          data.videos.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v;
+            opt.textContent = v;
+            // Default select Trafic.mp4 if available, otherwise race.mp4, otherwise crowd.mp4
+            if (v === 'Trafic.mp4') {
+              opt.selected = true;
+            } else if (v === 'race.mp4' && !data.videos.includes('Trafic.mp4')) {
+              opt.selected = true;
+            } else if (v === 'crowd.mp4' && !data.videos.includes('Trafic.mp4') && !data.videos.includes('race.mp4')) {
+              opt.selected = true;
+            }
+            videoSelect.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load videos list:", e);
+      }
+    }
+
+    loadVideosList();
+    fetchConfig();
+
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+
+    window.addEventListener('beforeunload', () => {
+      if (feedActive) navigator.sendBeacon('/api/stop');
+    });
+  </script>
+</body>
+</html>

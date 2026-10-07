@@ -1,0 +1,2 @@
+@echo off
+"C:\Users\User\Desktop\work\Aitronix projects\deployment\yolo real time\.venv\Scripts\python.exe" "C:\Users\User\Desktop\work\Aitronix projects\deployment\camscense\server.py" > "C:\Users\User\Desktop\work\Aitronix projects\deployment\camscense\server.log" 2>&1
